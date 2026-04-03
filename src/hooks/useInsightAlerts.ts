@@ -2,6 +2,58 @@ import { useMemo } from "react";
 import { useReviewStore } from "@/stores/useReviewStore";
 import { insightAlerts as fallbackAlerts, type InsightAlert } from "@/data/mockData";
 
+export function useInsightMetrics() {
+  const reviews = useReviewStore((s) => s.reviews);
+  const aiResponses = useReviewStore((s) => s.aiResponses);
+
+  return useMemo(() => {
+    // Best responses — top 3 by confidenceScore, joined with their review snippet
+    const bestResponses = [...aiResponses]
+      .sort((a, b) => b.confidenceScore - a.confidenceScore)
+      .slice(0, 3)
+      .map((resp) => {
+        const review = reviews.find((r) => r.id === resp.reviewId);
+        return {
+          id: resp.id,
+          engagementScore: Math.round(resp.confidenceScore * 100),
+          responseSnippet: resp.text.slice(0, 120) + (resp.text.length > 120 ? "…" : ""),
+          reviewRating: review?.rating ?? null,
+        };
+      });
+
+    // Avg response time in hours (review.date → aiResponse.createdAt)
+    let totalHours = 0;
+    let respondedCount = 0;
+    for (const resp of aiResponses) {
+      const review = reviews.find((r) => r.id === resp.reviewId);
+      if (!review) continue;
+      const diffMs = new Date(resp.createdAt).getTime() - new Date(review.date).getTime();
+      if (diffMs > 0) {
+        totalHours += diffMs / (1000 * 60 * 60);
+        respondedCount++;
+      }
+    }
+    const avgResponseHours = respondedCount > 0 ? totalHours / respondedCount : null;
+
+    // Rating boost: avg rating of responded reviews vs unresponded
+    const respondedIds = new Set(aiResponses.map((r) => r.reviewId));
+    const respondedReviews = reviews.filter((r) => respondedIds.has(r.id));
+    const unrespondedReviews = reviews.filter((r) => !respondedIds.has(r.id));
+    const avgResponded = respondedReviews.length
+      ? respondedReviews.reduce((s, r) => s + r.rating, 0) / respondedReviews.length
+      : null;
+    const avgUnresponded = unrespondedReviews.length
+      ? unrespondedReviews.reduce((s, r) => s + r.rating, 0) / unrespondedReviews.length
+      : null;
+    const ratingBoost =
+      avgResponded !== null && avgUnresponded !== null
+        ? +(avgResponded - avgUnresponded).toFixed(1)
+        : null;
+
+    return { bestResponses, avgResponseHours, ratingBoost, respondedCount };
+  }, [reviews, aiResponses]);
+}
+
 function getWeekStart(date: Date): string {
   const d = new Date(date);
   d.setDate(d.getDate() - d.getDay());
@@ -10,8 +62,10 @@ function getWeekStart(date: Date): string {
 
 export function useInsightAlerts(): InsightAlert[] {
   const reviews = useReviewStore((s) => s.reviews);
+  const aiResponses = useReviewStore((s) => s.aiResponses);
 
   return useMemo(() => {
+    const respondedIds = new Set(aiResponses.map((r) => r.reviewId));
     const now = new Date();
     const thisWeekStart = new Date(now);
     thisWeekStart.setDate(thisWeekStart.getDate() - thisWeekStart.getDay());
@@ -92,9 +146,44 @@ export function useInsightAlerts(): InsightAlert[] {
       }
     }
 
+    // Unresponded CRITICAL reviews alert
+    const unansweredCritical = reviews.filter(
+      (r) => r.priority === "CRITICAL" && r.status === "pending" && !respondedIds.has(r.id)
+    );
+    if (unansweredCritical.length > 0) {
+      dynamicAlerts.unshift({
+        id: "dynamic-alert-critical",
+        type: "impact",
+        title: `${unansweredCritical.length} critical review${unansweredCritical.length > 1 ? "s" : ""} need a response`,
+        description: `${unansweredCritical.length} high-priority review${unansweredCritical.length > 1 ? "s" : ""} ${unansweredCritical.length > 1 ? "are" : "is"} still pending. Unanswered critical reviews damage your rating.`,
+        severity: "high",
+        recommendation: "Go to Reviews → filter by Critical priority and respond today.",
+        date: now.toISOString(),
+      });
+    }
+
+    // Low average rating alert (30-day window)
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const recentReviews = reviews.filter((r) => new Date(r.date) >= thirtyDaysAgo);
+    if (recentReviews.length >= 5) {
+      const avgRating = recentReviews.reduce((s, r) => s + r.rating, 0) / recentReviews.length;
+      if (avgRating < 3.8) {
+        dynamicAlerts.unshift({
+          id: "dynamic-alert-low-rating",
+          type: "trend",
+          title: `Average rating dropped to ${avgRating.toFixed(1)} stars`,
+          description: `Your 30-day average rating is ${avgRating.toFixed(1)} across ${recentReviews.length} reviews — below the 3.8 threshold.`,
+          severity: avgRating < 3.0 ? "high" : "medium",
+          recommendation: "Focus on resolving the top complaint topics below and respond to all negative reviews promptly.",
+          date: now.toISOString(),
+        });
+      }
+    }
+
     // If no dynamic alerts were generated, fall back to static ones
     return dynamicAlerts.length > 0 ? dynamicAlerts : fallbackAlerts;
-  }, [reviews]);
+  }, [reviews, aiResponses]);
 }
 
 export function useTopicComplaintData() {

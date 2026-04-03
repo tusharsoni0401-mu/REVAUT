@@ -1,9 +1,8 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { sentimentBreakdown, bestResponses } from "@/data/mockData";
 import { useReviewStore } from "@/stores/useReviewStore";
-import { useInsightAlerts, useTopicComplaintData } from "@/hooks/useInsightAlerts";
+import { useInsightAlerts, useTopicComplaintData, useInsightMetrics } from "@/hooks/useInsightAlerts";
 import { AlertTriangle, TrendingUp, Lightbulb, ArrowUp, ArrowDown, Minus, Calendar } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -17,6 +16,7 @@ export default function Insights() {
   const reviews = useReviewStore((s) => s.reviews);
   const alerts = useInsightAlerts();
   const topicComplaintData = useTopicComplaintData();
+  const { bestResponses, avgResponseHours, ratingBoost } = useInsightMetrics();
 
   // Dynamic sentiment breakdown from store
   const dynamicSentiment = useMemo(() => {
@@ -123,9 +123,11 @@ export default function Insights() {
           <CardDescription>Responses with highest engagement scores</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
-          {bestResponses.map((r, i) => (
-            <div key={i} className="flex items-center gap-3 rounded-lg border p-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-success/10 text-success font-bold text-sm">
+          {bestResponses.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No responses generated yet.</p>
+          ) : bestResponses.map((r) => (
+            <div key={r.id} className="flex items-center gap-3 rounded-lg border p-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-success/10 text-success font-bold text-sm shrink-0">
                 {r.engagementScore}
               </div>
               <p className="text-sm text-muted-foreground line-clamp-1 flex-1">{r.responseSnippet}</p>
@@ -141,11 +143,15 @@ export default function Insights() {
         <CardContent>
           <div className="grid grid-cols-2 gap-3">
             <div className="text-center rounded-lg border p-3">
-              <p className="text-2xl font-bold text-success">+0.3</p>
+              <p className="text-2xl font-bold text-success">
+                {ratingBoost !== null ? (ratingBoost >= 0 ? `+${ratingBoost}` : ratingBoost) : "—"}
+              </p>
               <p className="text-xs text-muted-foreground">Avg rating boost from responding</p>
             </div>
             <div className="text-center rounded-lg border p-3">
-              <p className="text-2xl font-bold text-primary">4.2h</p>
+              <p className="text-2xl font-bold text-primary">
+                {avgResponseHours !== null ? `${avgResponseHours.toFixed(1)}h` : "—"}
+              </p>
               <p className="text-xs text-muted-foreground">Avg response time</p>
             </div>
           </div>
