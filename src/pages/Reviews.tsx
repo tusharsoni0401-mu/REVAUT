@@ -1,5 +1,6 @@
 import { Link, useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StarRating } from "@/components/StarRating";
@@ -30,6 +31,7 @@ export default function Reviews() {
     }, { replace: true });
   }
 
+  const loading = useReviewStore((s) => s.loading);
   const filtered = useReviewStore((s) =>
     s.reviewsByFilters({
       search,
@@ -115,12 +117,29 @@ export default function Reviews() {
 
       {/* Review list */}
       <div className="space-y-2">
-        {filtered.length === 0 && (
+        {loading && Array.from({ length: 6 }).map((_, i) => (
+          <Card key={i}><CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <Skeleton className="h-9 w-9 rounded-full shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3 w-40" />
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-3/4" />
+                <div className="flex gap-1.5">
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                  <Skeleton className="h-5 w-20 rounded-full" />
+                </div>
+              </div>
+            </div>
+          </CardContent></Card>
+        ))}
+        {!loading && filtered.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-12">
             No reviews match your filters.
           </p>
         )}
-        {filtered.map((review) => (
+        {!loading && filtered.map((review) => (
           <Link to={`/reviews/${review.id}`} key={review.id}>
             <Card className="hover:shadow-md transition-shadow cursor-pointer">
               <CardContent className="p-4">

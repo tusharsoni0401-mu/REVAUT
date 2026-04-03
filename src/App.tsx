@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/Layout";
 import { AuthGuard } from "@/components/AuthGuard";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Dashboard from "@/pages/Dashboard";
 import Reviews from "@/pages/Reviews";
 import ReviewDetail from "@/pages/ReviewDetail";
@@ -51,6 +52,7 @@ const App = () => (
               <AuthGuard>
                 <DataLoader />
                 <Layout>
+                  <ErrorBoundary>
                   <Routes>
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/reviews" element={<Reviews />} />
@@ -61,6 +63,7 @@ const App = () => (
                     <Route path="/backfill" element={<BackfillQueue />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
+                  </ErrorBoundary>
                 </Layout>
               </AuthGuard>
             }

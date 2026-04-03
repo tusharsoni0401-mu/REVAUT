@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StarRating } from "@/components/StarRating";
 import { SentimentBadge } from "@/components/ReviewBadges";
 import { ratingTrendData } from "@/data/mockData";
@@ -12,6 +13,7 @@ import { GoogleMapsAnalytics } from "@/components/GoogleMapsAnalytics";
 
 export default function Dashboard() {
   const reviews = useReviewStore((s) => s.reviews);
+  const loading = useReviewStore((s) => s.loading);
   const pendingCount = useReviewStore((s) => s.pendingCount());
 
   const totalReviews = reviews.length;
@@ -26,6 +28,37 @@ export default function Dashboard() {
     { label: "Response Rate", value: `${responseRate}%`, icon: TrendingUp, color: "text-success" },
     { label: "Pending", value: pendingCount, icon: Clock, color: "text-destructive", href: "/reviews?status=pending" },
   ];
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground text-sm">Review performance overview for restaurants, hotels & resorts</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}><CardContent className="p-4 space-y-2">
+              <Skeleton className="h-4 w-4" />
+              <Skeleton className="h-8 w-16" />
+              <Skeleton className="h-3 w-24" />
+            </CardContent></Card>
+          ))}
+        </div>
+        <Card><CardContent className="p-4 space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex items-start gap-3">
+              <Skeleton className="h-8 w-8 rounded-full shrink-0" />
+              <div className="flex-1 space-y-1.5">
+                <Skeleton className="h-3 w-32" />
+                <Skeleton className="h-3 w-full" />
+              </div>
+            </div>
+          ))}
+        </CardContent></Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
