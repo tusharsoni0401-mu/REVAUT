@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,12 +10,25 @@ import { useReviewStore } from "@/stores/useReviewStore";
 import { Search } from "lucide-react";
 
 export default function Reviews() {
-  const [params] = useSearchParams();
-  const [search, setSearch] = useState(params.get("search") ?? "");
-  const [sentimentFilter, setSentimentFilter] = useState<string>(params.get("sentiment") ?? "all");
-  const [statusFilter, setStatusFilter] = useState<string>(params.get("status") ?? "all");
-  const [ratingFilter, setRatingFilter] = useState<string>(params.get("rating") ?? "all");
-  const [platformFilter, setPlatformFilter] = useState<string>(params.get("platform") ?? "all");
+  const [params, setParams] = useSearchParams();
+
+  const search = params.get("search") ?? "";
+  const sentimentFilter = params.get("sentiment") ?? "all";
+  const statusFilter = params.get("status") ?? "all";
+  const ratingFilter = params.get("rating") ?? "all";
+  const platformFilter = params.get("platform") ?? "all";
+
+  function setFilter(key: string, value: string) {
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value === "all" || value === "") {
+        next.delete(key);
+      } else {
+        next.set(key, value);
+      }
+      return next;
+    }, { replace: true });
+  }
 
   const filtered = useReviewStore((s) =>
     s.reviewsByFilters({
@@ -43,12 +55,12 @@ export default function Reviews() {
             placeholder="Search reviews..."
             className="pl-9"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => setFilter("search", e.target.value)}
           />
         </div>
         <div className="flex gap-2 flex-wrap">
           {/* Platform filter — was missing from original */}
-          <Select value={platformFilter} onValueChange={setPlatformFilter}>
+          <Select value={platformFilter} onValueChange={(v) => setFilter("platform", v)}>
             <SelectTrigger className="w-[130px]">
               <SelectValue placeholder="Platform" />
             </SelectTrigger>
@@ -62,7 +74,7 @@ export default function Reviews() {
             </SelectContent>
           </Select>
 
-          <Select value={sentimentFilter} onValueChange={setSentimentFilter}>
+          <Select value={sentimentFilter} onValueChange={(v) => setFilter("sentiment", v)}>
             <SelectTrigger className="w-[110px]">
               <SelectValue placeholder="Sentiment" />
             </SelectTrigger>
@@ -74,7 +86,7 @@ export default function Reviews() {
             </SelectContent>
           </Select>
 
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={(v) => setFilter("status", v)}>
             <SelectTrigger className="w-[110px]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
@@ -87,7 +99,7 @@ export default function Reviews() {
             </SelectContent>
           </Select>
 
-          <Select value={ratingFilter} onValueChange={setRatingFilter}>
+          <Select value={ratingFilter} onValueChange={(v) => setFilter("rating", v)}>
             <SelectTrigger className="w-[80px]">
               <SelectValue placeholder="Stars" />
             </SelectTrigger>

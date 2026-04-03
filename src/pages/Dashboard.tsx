@@ -16,7 +16,8 @@ export default function Dashboard() {
 
   const totalReviews = reviews.length;
   const avgRating = Math.round((reviews.reduce((sum, r) => sum + r.rating, 0) / totalReviews) * 10) / 10;
-  const responseRate = 72; // placeholder until real tracking
+  const responded = reviews.filter((r) => r.status === "approved" || r.status === "posted").length;
+  const responseRate = totalReviews > 0 ? Math.round((responded / totalReviews) * 100) : 0;
   const recentReviews = reviews.slice(0, 5);
 
   const stats = [

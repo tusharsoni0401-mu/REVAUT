@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { useLocation } from "react-router-dom";
@@ -15,6 +16,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
     if (pathname === "/backfill") return "Backfill Queue";
     return "Review Autopilot";
   })();
+
+  useEffect(() => {
+    document.title = `${pageTitle} | RevAut`;
+  }, [pageTitle]);
 
   return (
     <SidebarProvider>
