@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: revaut-api
+    runtime: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Set these in the Render dashboard → Environment tab
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      # Set to your Netlify frontend URL, e.g. https://revaut.netlify.app
+      - key: CORS_ORIGIN
+        sync: false
