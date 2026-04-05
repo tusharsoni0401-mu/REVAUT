@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/Layout";
 import { AuthGuard } from "@/components/AuthGuard";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { AuthProvider } from "@/contexts/AuthContext";
 import Dashboard from "@/pages/Dashboard";
 import Reviews from "@/pages/Reviews";
 import ReviewDetail from "@/pages/ReviewDetail";
@@ -39,37 +40,41 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/auth/gbp/callback" element={<GBPCallback />} />
+      <AuthProvider>
+        <BrowserRouter>
+          <ErrorBoundary>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/auth/gbp/callback" element={<GBPCallback />} />
 
-          {/* Protected routes — all wrapped in AuthGuard + Layout */}
-          <Route
-            path="/*"
-            element={
-              <AuthGuard>
-                <DataLoader />
-                <Layout>
-                  <ErrorBoundary>
-                  <Routes>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/reviews" element={<Reviews />} />
-                    <Route path="/reviews/:id" element={<ReviewDetail />} />
-                    <Route path="/brand-voice" element={<BrandVoice />} />
-                    <Route path="/insights" element={<Insights />} />
-                    <Route path="/settings" element={<SettingsPage />} />
-                    <Route path="/backfill" element={<BackfillQueue />} />
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                  </ErrorBoundary>
-                </Layout>
-              </AuthGuard>
-            }
-          />
-        </Routes>
-      </BrowserRouter>
+              {/* Protected routes — all wrapped in AuthGuard + Layout */}
+              <Route
+                path="/*"
+                element={
+                  <AuthGuard>
+                    <DataLoader />
+                    <Layout>
+                      <ErrorBoundary>
+                        <Routes>
+                          <Route path="/" element={<Dashboard />} />
+                          <Route path="/reviews" element={<Reviews />} />
+                          <Route path="/reviews/:id" element={<ReviewDetail />} />
+                          <Route path="/brand-voice" element={<BrandVoice />} />
+                          <Route path="/insights" element={<Insights />} />
+                          <Route path="/settings" element={<SettingsPage />} />
+                          <Route path="/backfill" element={<BackfillQueue />} />
+                          <Route path="*" element={<NotFound />} />
+                        </Routes>
+                      </ErrorBoundary>
+                    </Layout>
+                  </AuthGuard>
+                }
+              />
+            </Routes>
+          </ErrorBoundary>
+        </BrowserRouter>
+      </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

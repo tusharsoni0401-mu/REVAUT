@@ -4,7 +4,8 @@ import { StarRating } from "@/components/StarRating";
 import { SentimentBadge } from "@/components/ReviewBadges";
 import { ratingTrendData } from "@/data/mockData";
 import { useReviewStore } from "@/stores/useReviewStore";
-import { MessageSquare, Star, TrendingUp, Clock, ArrowRight } from "lucide-react";
+import { MessageSquare, Star, TrendingUp, Clock, ArrowRight, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -14,10 +15,13 @@ import { GoogleMapsAnalytics } from "@/components/GoogleMapsAnalytics";
 export default function Dashboard() {
   const reviews = useReviewStore((s) => s.reviews);
   const loading = useReviewStore((s) => s.loading);
+  const storeError = useReviewStore((s) => s.error);
   const pendingCount = useReviewStore((s) => s.pendingCount());
 
   const totalReviews = reviews.length;
-  const avgRating = Math.round((reviews.reduce((sum, r) => sum + r.rating, 0) / totalReviews) * 10) / 10;
+  const avgRating = totalReviews > 0
+    ? Math.round((reviews.reduce((sum, r) => sum + r.rating, 0) / totalReviews) * 10) / 10
+    : 0;
   const responded = reviews.filter((r) => r.status === "approved" || r.status === "posted").length;
   const responseRate = totalReviews > 0 ? Math.round((responded / totalReviews) * 100) : 0;
   const recentReviews = reviews.slice(0, 5);
@@ -56,6 +60,27 @@ export default function Dashboard() {
             </div>
           ))}
         </CardContent></Card>
+      </div>
+    );
+  }
+
+  if (storeError) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground text-sm">Review performance overview for restaurants, hotels & resorts</p>
+        </div>
+        <Card className="border-destructive/30">
+          <CardContent className="py-10 text-center space-y-3">
+            <AlertTriangle className="h-8 w-8 mx-auto text-destructive" />
+            <p className="text-sm font-medium">Failed to load data</p>
+            <p className="text-xs text-muted-foreground">{storeError}</p>
+            <Button variant="outline" size="sm" onClick={() => useReviewStore.getState().fetchAll()}>
+              Try again
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

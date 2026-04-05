@@ -1,38 +1,8 @@
-import { useState, useEffect } from "react";
-import type { User, Session } from "@supabase/supabase-js";
+// Auth state is managed by AuthContext — single subscription shared across all components.
+// Re-export the hook so existing imports from "@/hooks/useAuth" keep working.
+export { useAuth } from "@/contexts/AuthContext";
+
 import { supabase } from "@/lib/supabase";
-
-interface AuthState {
-  user: User | null;
-  session: Session | null;
-  loading: boolean;
-}
-
-export function useAuth(): AuthState {
-  const [user,    setUser]    = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    // Listen for auth state changes (login, logout, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  return { user, session, loading };
-}
 
 export async function signIn(email: string, password: string) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Mic2, Plus, X, Eye, Loader2 } from "lucide-react";
+import { Mic2, Plus, X, Eye, Loader2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useBrandVoice } from "@/hooks/useBrandVoice";
 
@@ -16,6 +16,7 @@ export default function BrandVoice() {
     settings,
     loading,
     saving,
+    error: brandVoiceError,
     updateTone,
     setPersona,
     addExample,
@@ -171,6 +172,13 @@ export default function BrandVoice() {
           </CardContent>
         )}
       </Card>
+
+      {brandVoiceError && (
+        <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+          <AlertCircle className="h-4 w-4 text-destructive shrink-0" />
+          <p className="text-sm text-destructive">{brandVoiceError}</p>
+        </div>
+      )}
 
       <Button className="w-full" onClick={handleSave} disabled={saving}>
         {saving

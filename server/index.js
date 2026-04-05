@@ -35,7 +35,10 @@ async function callGemini(prompt, temperature = 0.7) {
 
   const data = await res.json();
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error("No text in Gemini response");
+  if (!text) {
+    console.error("Unexpected Gemini response structure:", JSON.stringify(data, null, 2));
+    throw new Error("No text in Gemini response — check server logs");
+  }
   return text.trim();
 }
 

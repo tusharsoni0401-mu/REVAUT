@@ -94,7 +94,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="p-4 space-y-2">
-        {!collapsed && (
+        {!collapsed && activeLocation && (
           <Popover>
             <PopoverTrigger asChild>
               <button className="w-full rounded-lg border bg-accent/50 p-3 text-left hover:bg-accent transition-colors">

@@ -1,16 +1,22 @@
 import { useState, FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { signIn, signUp } from "@/hooks/useAuth";
+import { useAuth, signIn, signUp } from "@/hooks/useAuth";
 
 export default function Login() {
   const navigate   = useNavigate();
   const { toast }  = useToast();
+  const { user, loading: authLoading } = useAuth();
+
+  // If already authenticated, redirect to dashboard
+  if (!authLoading && user) {
+    return <Navigate to="/" replace />;
+  }
 
   const [mode,     setMode]     = useState<"login" | "signup">("login");
   const [email,    setEmail]    = useState("");

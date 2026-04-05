@@ -16,7 +16,7 @@ export function useInsightMetrics() {
         return {
           id: resp.id,
           engagementScore: Math.round(resp.confidenceScore * 100),
-          responseSnippet: resp.text.slice(0, 120) + (resp.text.length > 120 ? "…" : ""),
+          responseSnippet: (resp.text ?? "").slice(0, 120) + ((resp.text?.length ?? 0) > 120 ? "…" : ""),
           reviewRating: review?.rating ?? null,
         };
       });

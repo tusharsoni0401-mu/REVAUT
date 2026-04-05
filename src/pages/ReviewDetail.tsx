@@ -11,7 +11,7 @@ import { useReviewStore } from "@/stores/useReviewStore";
 import { generateReviewResponse, toAIResponse } from "@/services/geminiService";
 import {
   ArrowLeft, Check, Edit3, X, RefreshCw, Bot, Shield,
-  Target, Type, Ruler, Clock, AlertCircle,
+  Target, Type, Ruler, Clock, AlertCircle, Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -19,6 +19,7 @@ export default function ReviewDetail() {
   const { id } = useParams();
   const { toast } = useToast();
 
+  const storeLoading = useReviewStore((s) => s.loading);
   const review = useReviewStore((s) => s.getReview(id ?? ""));
   const response = useReviewStore((s) => s.getAIResponse(id ?? ""));
   const updateReviewStatus = useReviewStore((s) => s.updateReviewStatus);
@@ -29,6 +30,14 @@ export default function ReviewDetail() {
   const [editText, setEditText] = useState(response?.text ?? "");
   const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  if (storeLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   if (!review) {
     return (

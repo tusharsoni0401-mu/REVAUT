@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,12 +15,19 @@ export default function BackfillQueue() {
   const { toast } = useToast();
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const grouped = useReviewStore((s) => s.groupedBackfill());
-  const backfillReviews = useReviewStore((s) => s.backfillReviews());
+  const reviews = useReviewStore((s) => s.reviews);
   const postedToday = useReviewStore((s) => s.postedToday);
   const dailyLimit = useReviewStore((s) => s.dailyLimit);
   const batchUpdateStatus = useReviewStore((s) => s.batchUpdateStatus);
   const incrementPostedToday = useReviewStore((s) => s.incrementPostedToday);
+
+  const backfillReviews = useMemo(() => reviews.filter((r) => r.isBackfill), [reviews]);
+  const grouped = useMemo(() => ({
+    CRITICAL: backfillReviews.filter((r) => r.priority === "CRITICAL"),
+    HIGH:     backfillReviews.filter((r) => r.priority === "HIGH"),
+    MEDIUM:   backfillReviews.filter((r) => r.priority === "MEDIUM"),
+    LOW:      backfillReviews.filter((r) => r.priority === "LOW"),
+  }), [backfillReviews]);
 
   const remaining = dailyLimit - postedToday;
   const limitReached = remaining <= 0;
