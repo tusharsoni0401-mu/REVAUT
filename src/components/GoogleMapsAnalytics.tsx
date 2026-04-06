@@ -39,148 +39,28 @@ const BUSINESS_CONFIG: Record<BusinessType, {
   icon: typeof Utensils;
   label: string;
   placeholder: string;
-  topics: LocationAnalytics["topTopics"];
-  highlights: string[];
-  warnings: string[];
 }> = {
   restaurant: {
     icon: Utensils,
     label: "Restaurant",
     placeholder: "https://maps.google.com/maps/place/Your+Restaurant...",
-    topics: [
-      { topic: "Food Quality", count: 312, sentiment: "positive" },
-      { topic: "Service Speed", count: 187, sentiment: "negative" },
-      { topic: "Ambience", count: 156, sentiment: "positive" },
-      { topic: "Pricing", count: 98, sentiment: "neutral" },
-      { topic: "Cleanliness", count: 74, sentiment: "positive" },
-      { topic: "Wait Time", count: 63, sentiment: "negative" },
-    ],
-    highlights: [
-      '"Amazing pasta" mentioned 45 times this month',
-      "Weekend ratings are 0.4 stars higher than weekdays",
-      "Photos with reviews increased 23% — great for visibility",
-    ],
-    warnings: [
-      '"Slow service" complaints up 35% in the last 2 weeks',
-      "38% of negative reviews mention wait times over 30 minutes",
-      "12 reviews from the past week are still unanswered",
-    ],
   },
   hotel: {
     icon: Hotel,
     label: "Hotel",
     placeholder: "https://maps.google.com/maps/place/Your+Hotel...",
-    topics: [
-      { topic: "Room Cleanliness", count: 428, sentiment: "positive" },
-      { topic: "Check-in Experience", count: 215, sentiment: "negative" },
-      { topic: "Breakfast Quality", count: 189, sentiment: "positive" },
-      { topic: "Wi-Fi / Amenities", count: 142, sentiment: "negative" },
-      { topic: "Staff Friendliness", count: 134, sentiment: "positive" },
-      { topic: "Noise Level", count: 97, sentiment: "negative" },
-    ],
-    highlights: [
-      '"Spotless rooms" praised in 62 reviews this month',
-      "Concierge service rated 4.8 stars on average",
-      "Repeat guest rate up 18% quarter over quarter",
-    ],
-    warnings: [
-      '"Slow check-in" complaints up 40% during peak season',
-      "27% of negative reviews mention outdated room furnishings",
-      "Wi-Fi complaints doubled in the past 3 weeks",
-    ],
   },
   resort: {
     icon: Palmtree,
     label: "Resort",
     placeholder: "https://maps.google.com/maps/place/Your+Resort...",
-    topics: [
-      { topic: "Pool & Spa", count: 356, sentiment: "positive" },
-      { topic: "Dining Options", count: 278, sentiment: "positive" },
-      { topic: "Beach Access", count: 198, sentiment: "positive" },
-      { topic: "Value for Money", count: 165, sentiment: "negative" },
-      { topic: "Activities & Entertainment", count: 143, sentiment: "neutral" },
-      { topic: "Room Service Speed", count: 89, sentiment: "negative" },
-    ],
-    highlights: [
-      '"Best spa experience" mentioned 38 times this month',
-      "Family-friendly activities rated 4.7 stars average",
-      "Sunset dining experience driving 5-star reviews",
-    ],
-    warnings: [
-      '"Overpriced" mentioned in 22% of recent negative reviews',
-      "Pool crowding complaints spike on weekends — consider capacity limits",
-      "15 reviews about slow room service in the past week",
-    ],
   },
   cafe: {
     icon: Coffee,
     label: "Cafe",
     placeholder: "https://maps.google.com/maps/place/Your+Cafe...",
-    topics: [
-      { topic: "Coffee Quality", count: 264, sentiment: "positive" },
-      { topic: "Pastry Selection", count: 171, sentiment: "positive" },
-      { topic: "Seating Availability", count: 138, sentiment: "neutral" },
-      { topic: "Wi-Fi Reliability", count: 112, sentiment: "negative" },
-      { topic: "Noise Level", count: 96, sentiment: "negative" },
-      { topic: "Service Speed", count: 84, sentiment: "neutral" },
-    ],
-    highlights: [
-      '"Best latte in the neighborhood" mentioned 29 times this month',
-      "Remote workers rate the atmosphere 4.6 stars on weekdays",
-      "Pastry pairings are driving more photo reviews and repeat visits",
-    ],
-    warnings: [
-      '"No seats available" complaints spike during the afternoon rush',
-      "Wi-Fi issues are mentioned in 18% of recent low-rated reviews",
-      "Noise complaints are rising among laptop and study visitors",
-    ],
   },
 };
-
-function generateMockAnalytics(url: string, businessType: BusinessType): LocationAnalytics {
-  const config = BUSINESS_CONFIG[businessType];
-  const nameFromUrl = url.includes("place/")
-    ? decodeURIComponent(url.split("place/")[1]?.split("/")[0]?.replace(/\+/g, " ") || `Your ${config.label}`)
-    : `Your ${config.label}`;
-
-  const baseReviews =
-    businessType === "restaurant" ? 847 :
-    businessType === "hotel" ? 1243 :
-    businessType === "resort" ? 956 :
-    689;
-  const baseRating =
-    businessType === "restaurant" ? 4.3 :
-    businessType === "hotel" ? 4.1 :
-    businessType === "resort" ? 4.5 :
-    4.4;
-
-  return {
-    name: nameFromUrl,
-    address: "123 Main Street, New York, NY 10001",
-    businessType,
-    rating: baseRating,
-    totalReviews: baseReviews,
-    responseRate: businessType === "resort" ? 78 : businessType === "cafe" ? 69 : 62,
-    avgResponseTime: businessType === "hotel" ? "12 hours" : businessType === "cafe" ? "9 hours" : "18 hours",
-    sentimentBreakdown: [
-      { name: "Positive", value: businessType === "resort" ? 72 : businessType === "cafe" ? 70 : 68, color: "hsl(var(--success))" },
-      { name: "Neutral", value: businessType === "cafe" ? 16 : 18, color: "hsl(var(--warning))" },
-      { name: "Negative", value: businessType === "resort" ? 10 : businessType === "cafe" ? 14 : 14, color: "hsl(var(--destructive))" },
-    ],
-    topTopics: config.topics,
-    ratingDistribution: [
-      { stars: "5★", count: Math.round(baseReviews * 0.4) },
-      { stars: "4★", count: Math.round(baseReviews * 0.29) },
-      { stars: "3★", count: Math.round(baseReviews * 0.15) },
-      { stars: "2★", count: Math.round(baseReviews * 0.1) },
-      { stars: "1★", count: Math.round(baseReviews * 0.06) },
-    ],
-    recentTrend: "up",
-    trendDelta: 0.2,
-    highlights: config.highlights,
-    warnings: config.warnings,
-  };
-}
 
 const SENTIMENT_ICON = {
   positive: <ThumbsUp className="h-3 w-3 text-success" />,
@@ -214,20 +94,19 @@ export function GoogleMapsAnalytics() {
   const [error, setError] = useState("");
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Animate progress bar while loading
+  // Animate progress bar while loading (slow ramp for ~20-30s scrape)
   useEffect(() => {
     if (loading) {
       setProgress(0);
-      // Ramp up to ~90% over 1.8s, then snap to 100 when data arrives
       progressRef.current = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 90) {
             clearInterval(progressRef.current!);
             return 90;
           }
-          return prev + 6;
+          return prev + 2;
         });
-      }, 120);
+      }, 600);
     } else {
       if (progressRef.current) clearInterval(progressRef.current);
       if (analytics) setProgress(100);
@@ -237,7 +116,7 @@ export function GoogleMapsAnalytics() {
     };
   }, [loading, analytics]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError("");
     const trimmed = url.trim();
     if (!trimmed) {
@@ -250,10 +129,26 @@ export function GoogleMapsAnalytics() {
     }
     setLoading(true);
     setAnalytics(null);
-    setTimeout(() => {
-      setAnalytics(generateMockAnalytics(trimmed, businessType));
+
+    try {
+      const res = await fetch("/api/analyze-location", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: trimmed, businessType }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: "Server error" }));
+        throw new Error(body.error || `Request failed (${res.status})`);
+      }
+
+      const data = await res.json();
+      setAnalytics(data as LocationAnalytics);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to analyze location");
+    } finally {
       setLoading(false);
-    }, 2000);
+    }
   };
 
   const config = BUSINESS_CONFIG[businessType];
@@ -313,8 +208,8 @@ export function GoogleMapsAnalytics() {
           <CardContent className="py-10 text-center space-y-3">
             <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
             <div>
-              <p className="text-sm font-medium">Analyzing {config.label.toLowerCase()} reviews...</p>
-              <p className="text-xs text-muted-foreground">Scanning ratings, sentiment, and topics</p>
+              <p className="text-sm font-medium">Scraping & analyzing {config.label.toLowerCase()} reviews...</p>
+              <p className="text-xs text-muted-foreground">This takes 15-30 seconds — loading reviews from Google Maps</p>
             </div>
             {/* Fix: animated progress driven by state, not hardcoded */}
             <Progress value={progress} className="w-48 mx-auto transition-all duration-150" />
