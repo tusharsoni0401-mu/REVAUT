@@ -1,7 +1,8 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import puppeteer from "puppeteer";
+import puppeteerCore from "puppeteer-core";
+import chromium from "@sparticuz/chromium";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -245,22 +246,32 @@ app.post("/api/evaluate-response", async (req, res) => {
 let _browser = null;
 async function getBrowser() {
   if (_browser && _browser.connected) return _browser;
-  _browser = await puppeteer.launch({
-    headless: "new",
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--no-first-run",
-      "--no-zygote",
-      "--disable-extensions",
-      "--disable-background-networking",
-      "--disable-default-apps",
-      "--disable-translate",
-      "--disable-sync",
-    ],
-  });
+
+  const isProduction = process.env.NODE_ENV === "production";
+
+  if (isProduction) {
+    // On Render: use @sparticuz/chromium's bundled lightweight binary
+    _browser = await puppeteerCore.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+    });
+  } else {
+    // Locally: dynamically import full puppeteer (devDependency) which bundles Chrome
+    const puppeteer = await import("puppeteer");
+    _browser = await puppeteer.default.launch({
+      headless: "new",
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--no-first-run",
+        "--no-zygote",
+      ],
+    });
+  }
   return _browser;
 }
 
