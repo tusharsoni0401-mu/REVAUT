@@ -301,22 +301,80 @@ app.post("/api/analyze-location", async (req, res) => {
     );
     await page.setViewport({ width: 1280, height: 900 });
 
-    // Navigate to the Maps URL
-    await page.goto(url, { waitUntil: "networkidle2", timeout: 45000 });
+    // Set English language to avoid localized consent dialogs
+    await page.setExtraHTTPHeaders({ "Accept-Language": "en-US,en;q=0.9" });
 
-    // Dismiss Google cookie consent if present
+    // Normalize URL: ensure it uses google.com (not google.de etc.) for English UI
+    let targetUrl = url;
+    if (url.includes("maps.app.goo.gl") || url.includes("goo.gl")) {
+      // Short URL — let it redirect, we'll handle consent after
+      targetUrl = url;
+    } else {
+      // Replace localized Google domains with google.com
+      targetUrl = url.replace(/google\.\w{2,3}(\.\w{2})?\//, "google.com/");
+    }
+
+    // Navigate to the Maps URL
+    await page.goto(targetUrl, { waitUntil: "networkidle2", timeout: 60000 });
+
+    console.log(`[analyze] Landed on: ${page.url()}`);
+
+    // Dismiss Google cookie consent if present (handles all languages)
     try {
-      const consentBtn = await page.$(
-        'button[aria-label="Accept all"], form[action*="consent"] button'
-      );
+      await page.waitForTimeout(1500);
+      const consentBtn = await page.evaluate(() => {
+        // Look for consent buttons across all languages
+        const selectors = [
+          'button[aria-label="Accept all"]',
+          'button[aria-label="Alle akzeptieren"]',
+          'button[aria-label="Tout accepter"]',
+          'button[aria-label="Aceptar todo"]',
+          'form[action*="consent"] button',
+          'button[jsname="b3VHJd"]',
+        ];
+        for (const sel of selectors) {
+          const btn = document.querySelector(sel);
+          if (btn) { btn.click(); return true; }
+        }
+        // Fallback: click any button containing "Accept" or "accept" text
+        const allBtns = document.querySelectorAll("button");
+        for (const btn of allBtns) {
+          const text = btn.textContent.toLowerCase();
+          if (text.includes("accept") || text.includes("akzeptieren") || text.includes("accepter")) {
+            btn.click();
+            return true;
+          }
+        }
+        return false;
+      });
       if (consentBtn) {
-        await consentBtn.click();
-        await page.waitForTimeout(1500);
+        console.log("[analyze] Dismissed consent dialog");
+        await page.waitForTimeout(3000);
+        await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 15000 }).catch(() => {});
       }
     } catch {}
 
-    // Wait for reviews to be present
-    await page.waitForSelector("[data-review-id]", { timeout: 20000 });
+    // If we landed on a place overview (not reviews tab), click the Reviews tab
+    try {
+      const reviewsTab = await page.evaluate(() => {
+        const tabs = document.querySelectorAll('button[role="tab"]');
+        for (const tab of tabs) {
+          const text = tab.textContent.toLowerCase();
+          if (text.includes("review") || text.includes("rezension") || text.includes("avis")) {
+            tab.click();
+            return true;
+          }
+        }
+        return false;
+      });
+      if (reviewsTab) {
+        console.log("[analyze] Clicked reviews tab");
+        await page.waitForTimeout(3000);
+      }
+    } catch {}
+
+    // Wait for reviews to be present (increased timeout)
+    await page.waitForSelector("[data-review-id]", { timeout: 30000 });
 
     // ── Extract place info ──────────────────────────────────────────
     const placeInfo = await page.evaluate(() => {
@@ -523,8 +581,16 @@ Base everything ONLY on the actual review content. Be specific — reference rea
     console.log(`[analyze] Done: ${placeInfo.name} — ${reviews.length} reviews analyzed`);
     return res.json(result);
   } catch (err) {
+    // Log debug info to help diagnose scraping failures
+    if (page) {
+      try {
+        const debugUrl = page.url();
+        const debugTitle = await page.title();
+        console.error(`[analyze] Failed at URL: ${debugUrl}, Title: "${debugTitle}"`);
+      } catch {}
+      try { await page.close(); } catch {}
+    }
     console.error("[analyze] Scrape error:", err.message);
-    if (page) try { await page.close(); } catch {}
     return res.status(500).json({
       error: "Failed to analyze location",
       details: err.message,
