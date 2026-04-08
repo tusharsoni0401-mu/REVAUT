@@ -385,8 +385,52 @@ app.post("/api/analyze-location", async (req, res) => {
       }
     } catch {}
 
-    // Wait for reviews to be present (increased timeout)
-    await page.waitForSelector("[data-review-id]", { timeout: 30000 });
+    // Wait for reviews — try multiple times with fallback strategies
+    let reviewsFound = false;
+    try {
+      await page.waitForSelector("[data-review-id]", { timeout: 15000 });
+      reviewsFound = true;
+    } catch {
+      // Reviews not found — try clicking any "reviews" link/button on the page
+      console.log("[analyze] Reviews not found, trying fallback clicks...");
+      console.log("[analyze] Current URL:", page.url());
+      const pageTitle = await page.title();
+      console.log("[analyze] Page title:", pageTitle);
+
+      await page.evaluate(() => {
+        // Click anything that mentions reviews
+        const allElements = document.querySelectorAll("a, button, [role='tab'], [jsaction]");
+        for (const el of allElements) {
+          const text = (el.textContent || "").toLowerCase();
+          const aria = (el.getAttribute("aria-label") || "").toLowerCase();
+          if (text.includes("review") || aria.includes("review")) {
+            el.click();
+            break;
+          }
+        }
+      });
+      await new Promise((r) => setTimeout(r, 5000));
+
+      try {
+        await page.waitForSelector("[data-review-id]", { timeout: 15000 });
+        reviewsFound = true;
+      } catch {}
+    }
+
+    if (!reviewsFound) {
+      // Last resort: dump what we can see for debugging
+      const debugInfo = await page.evaluate(() => ({
+        url: window.location.href,
+        title: document.title,
+        bodyText: document.body?.textContent?.substring(0, 500) || "",
+        hasH1: !!document.querySelector("h1"),
+        h1Text: document.querySelector("h1")?.textContent || "",
+      }));
+      console.error("[analyze] Could not find reviews. Debug:", JSON.stringify(debugInfo));
+      throw new Error(
+        `Could not find reviews on this page. The page loaded "${debugInfo.h1Text || debugInfo.title}" — make sure the URL points to a Google Maps place with reviews.`
+      );
+    }
 
     // ── Extract place info ──────────────────────────────────────────
     const placeInfo = await page.evaluate(() => {
