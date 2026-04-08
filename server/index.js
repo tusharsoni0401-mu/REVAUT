@@ -251,9 +251,18 @@ async function getBrowser() {
 
   if (isProduction) {
     // On Render: use @sparticuz/chromium's bundled lightweight binary
+    chromium.setGraphicsMode = false;
     _browser = await puppeteerCore.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
+      args: [
+        ...chromium.args,
+        "--single-process",
+        "--disable-background-networking",
+        "--disable-default-apps",
+        "--disable-extensions",
+        "--disable-translate",
+        "--disable-sync",
+      ],
+      defaultViewport: { width: 1280, height: 900 },
       executablePath: await chromium.executablePath(),
       headless: chromium.headless,
     });
@@ -314,14 +323,17 @@ app.post("/api/analyze-location", async (req, res) => {
       targetUrl = url.replace(/google\.\w{2,3}(\.\w{2})?\//, "google.com/");
     }
 
-    // Navigate to the Maps URL
-    await page.goto(targetUrl, { waitUntil: "networkidle2", timeout: 60000 });
+    // Navigate to the Maps URL — use domcontentloaded (not networkidle2)
+    // because Google Maps streams data endlessly and never becomes "idle"
+    await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+    // Give JS time to render the SPA
+    await new Promise((r) => setTimeout(r, 5000));
 
     console.log(`[analyze] Landed on: ${page.url()}`);
 
     // Dismiss Google cookie consent if present (handles all languages)
     try {
-      await page.waitForTimeout(1500);
+      await new Promise((r) => setTimeout(r, 1500));
       const consentBtn = await page.evaluate(() => {
         // Look for consent buttons across all languages
         const selectors = [
@@ -349,7 +361,7 @@ app.post("/api/analyze-location", async (req, res) => {
       });
       if (consentBtn) {
         console.log("[analyze] Dismissed consent dialog");
-        await page.waitForTimeout(3000);
+        await new Promise((r) => setTimeout(r, 3000));
         await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 15000 }).catch(() => {});
       }
     } catch {}
@@ -369,7 +381,7 @@ app.post("/api/analyze-location", async (req, res) => {
       });
       if (reviewsTab) {
         console.log("[analyze] Clicked reviews tab");
-        await page.waitForTimeout(3000);
+        await new Promise((r) => setTimeout(r, 3000));
       }
     } catch {}
 
@@ -408,7 +420,7 @@ app.post("/api/analyze-location", async (req, res) => {
         return true;
       });
       if (!scrolled) break;
-      await page.waitForTimeout(1200);
+      await new Promise((r) => setTimeout(r, 1200));
     }
 
     // ── Click all "See more" buttons to expand review text ──────────
@@ -417,7 +429,7 @@ app.post("/api/analyze-location", async (req, res) => {
       for (const btn of seeMoreButtons.slice(0, 60)) {
         try { await btn.click(); } catch {}
       }
-      await page.waitForTimeout(500);
+      await new Promise((r) => setTimeout(r, 500));
     } catch {}
 
     // ── Extract all reviews ─────────────────────────────────────────
