@@ -304,103 +304,123 @@ app.post("/api/analyze-location", async (req, res) => {
     const browser = await getBrowser();
     page = await browser.newPage();
 
-    // Stealth basics
+    // Stealth: realistic user-agent + viewport
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
     );
     await page.setViewport({ width: 1280, height: 900 });
-
-    // Set English language to avoid localized consent dialogs
     await page.setExtraHTTPHeaders({ "Accept-Language": "en-US,en;q=0.9" });
 
-    // Normalize URL: ensure it uses google.com (not google.de etc.) for English UI
+    // Pre-set consent cookie to bypass the cookie wall entirely
+    await page.setCookie({
+      name: "SOCS",
+      value: "CAISHAgBEhJnd3NfMjAyNDA1MDctMF9SQzIaAmVuIAEaBgiA_9S2Bg",
+      domain: ".google.com",
+      path: "/",
+      httpOnly: false,
+      secure: true,
+    });
+
+    // Normalize URL to google.com for consistent English UI
     let targetUrl = url;
-    if (url.includes("maps.app.goo.gl") || url.includes("goo.gl")) {
-      // Short URL — let it redirect, we'll handle consent after
-      targetUrl = url;
-    } else {
-      // Replace localized Google domains with google.com
+    if (!url.includes("maps.app.goo.gl") && !url.includes("goo.gl")) {
       targetUrl = url.replace(/google\.\w{2,3}(\.\w{2})?\//, "google.com/");
     }
 
-    // Navigate to the Maps URL — use domcontentloaded (not networkidle2)
-    // because Google Maps streams data endlessly and never becomes "idle"
-    await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
-    // Give JS time to render the SPA
-    await new Promise((r) => setTimeout(r, 5000));
+    // Navigate — use 'load' event for better SPA readiness
+    await page.goto(targetUrl, { waitUntil: "load", timeout: 60000 });
+    console.log(`[analyze] Page loaded: ${page.url()}`);
 
-    console.log(`[analyze] Landed on: ${page.url()}`);
-
-    // Dismiss Google cookie consent if present (handles all languages)
+    // Wait for Google Maps SPA to render (needs extra time on constrained servers)
+    // Poll for a known element — h1 (place name) or role=main
     try {
-      await new Promise((r) => setTimeout(r, 1500));
+      await page.waitForFunction(
+        () => {
+          const h1 = document.querySelector("h1");
+          return h1 && h1.textContent.trim().length > 0;
+        },
+        { timeout: 20000 }
+      );
+      console.log("[analyze] Place name rendered");
+    } catch {
+      console.log("[analyze] h1 not found after 20s, continuing anyway...");
+    }
+
+    // Dismiss consent dialog if the cookie didn't prevent it
+    try {
       const consentBtn = await page.evaluate(() => {
-        // Look for consent buttons across all languages
-        const selectors = [
-          'button[aria-label="Accept all"]',
-          'button[aria-label="Alle akzeptieren"]',
-          'button[aria-label="Tout accepter"]',
-          'button[aria-label="Aceptar todo"]',
-          'form[action*="consent"] button',
-          'button[jsname="b3VHJd"]',
-        ];
-        for (const sel of selectors) {
-          const btn = document.querySelector(sel);
-          if (btn) { btn.click(); return true; }
-        }
-        // Fallback: click any button containing "Accept" or "accept" text
-        const allBtns = document.querySelectorAll("button");
-        for (const btn of allBtns) {
+        const btns = document.querySelectorAll("button");
+        for (const btn of btns) {
           const text = btn.textContent.toLowerCase();
-          if (text.includes("accept") || text.includes("akzeptieren") || text.includes("accepter")) {
+          if (text.includes("accept") || text.includes("agree") || text.includes("akzeptieren") || text.includes("accepter")) {
             btn.click();
             return true;
           }
         }
+        // Also try form-based consent
+        const formBtn = document.querySelector('form[action*="consent"] button');
+        if (formBtn) { formBtn.click(); return true; }
         return false;
       });
       if (consentBtn) {
         console.log("[analyze] Dismissed consent dialog");
-        await new Promise((r) => setTimeout(r, 3000));
-        await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 15000 }).catch(() => {});
+        await new Promise((r) => setTimeout(r, 4000));
       }
     } catch {}
 
-    // If we landed on a place overview (not reviews tab), click the Reviews tab
+    // Click the Reviews tab if we're on the place overview
     try {
       const reviewsTab = await page.evaluate(() => {
+        // Try role=tab buttons first
         const tabs = document.querySelectorAll('button[role="tab"]');
         for (const tab of tabs) {
-          const text = tab.textContent.toLowerCase();
-          if (text.includes("review") || text.includes("rezension") || text.includes("avis")) {
-            tab.click();
-            return true;
-          }
+          if (/review/i.test(tab.textContent)) { tab.click(); return "tab"; }
         }
-        return false;
+        // Try aria-label links/buttons
+        const all = document.querySelectorAll("a, button");
+        for (const el of all) {
+          const aria = el.getAttribute("aria-label") || "";
+          if (/review/i.test(aria)) { el.click(); return "aria"; }
+        }
+        // Try any clickable with review count text like "1,234 reviews"
+        for (const el of all) {
+          if (/\d+\s*review/i.test(el.textContent)) { el.click(); return "text"; }
+        }
+        return null;
       });
       if (reviewsTab) {
-        console.log("[analyze] Clicked reviews tab");
-        await new Promise((r) => setTimeout(r, 3000));
+        console.log(`[analyze] Clicked reviews via: ${reviewsTab}`);
+        await new Promise((r) => setTimeout(r, 4000));
       }
     } catch {}
 
-    // Wait for reviews — try multiple times with fallback strategies
+    // Wait for review elements — multiple attempts
     let reviewsFound = false;
-    try {
-      await page.waitForSelector("[data-review-id]", { timeout: 15000 });
-      reviewsFound = true;
-    } catch {
-      // Reviews not found — try clicking any "reviews" link/button on the page
+    const reviewSelectors = [
+      "[data-review-id]",
+      "div.jftiEf",         // review card container
+      "span.wiI7pd",        // review text spans
+    ];
+
+    for (const sel of reviewSelectors) {
+      try {
+        await page.waitForSelector(sel, { timeout: 10000 });
+        reviewsFound = true;
+        console.log(`[analyze] Reviews found via selector: ${sel}`);
+        break;
+      } catch {}
+    }
+
+    if (!reviewsFound) {
+      // Fallback: try clicking anything mentioning "reviews" and retry
       console.log("[analyze] Reviews not found, trying fallback clicks...");
-      console.log("[analyze] Current URL:", page.url());
-      const pageTitle = await page.title();
-      console.log("[analyze] Page title:", pageTitle);
+      const debugUrl = page.url();
+      const debugTitle = await page.title();
+      console.log(`[analyze] URL: ${debugUrl}, Title: ${debugTitle}`);
 
       await page.evaluate(() => {
-        // Click anything that mentions reviews
-        const allElements = document.querySelectorAll("a, button, [role='tab'], [jsaction]");
-        for (const el of allElements) {
+        const els = document.querySelectorAll("a, button, [role='tab'], [jsaction]");
+        for (const el of els) {
           const text = (el.textContent || "").toLowerCase();
           const aria = (el.getAttribute("aria-label") || "").toLowerCase();
           if (text.includes("review") || aria.includes("review")) {
@@ -409,22 +429,25 @@ app.post("/api/analyze-location", async (req, res) => {
           }
         }
       });
-      await new Promise((r) => setTimeout(r, 5000));
+      await new Promise((r) => setTimeout(r, 6000));
 
-      try {
-        await page.waitForSelector("[data-review-id]", { timeout: 15000 });
-        reviewsFound = true;
-      } catch {}
+      for (const sel of reviewSelectors) {
+        try {
+          await page.waitForSelector(sel, { timeout: 10000 });
+          reviewsFound = true;
+          console.log(`[analyze] Reviews found on retry via: ${sel}`);
+          break;
+        } catch {}
+      }
     }
 
     if (!reviewsFound) {
-      // Last resort: dump what we can see for debugging
       const debugInfo = await page.evaluate(() => ({
         url: window.location.href,
         title: document.title,
-        bodyText: document.body?.textContent?.substring(0, 500) || "",
-        hasH1: !!document.querySelector("h1"),
+        bodyText: document.body?.textContent?.substring(0, 800) || "",
         h1Text: document.querySelector("h1")?.textContent || "",
+        allButtons: Array.from(document.querySelectorAll("button")).slice(0, 10).map(b => b.textContent.trim().substring(0, 50)),
       }));
       console.error("[analyze] Could not find reviews. Debug:", JSON.stringify(debugInfo));
       throw new Error(
@@ -454,12 +477,14 @@ app.post("/api/analyze-location", async (req, res) => {
     const MAX_SCROLLS = 8;
     for (let i = 0; i < MAX_SCROLLS; i++) {
       const scrolled = await page.evaluate(() => {
-        const container = document.querySelector(
-          '[aria-label="Refine reviews"]'
-        )?.parentElement?.parentElement;
-        if (!container) return false;
-        const scrollable =
-          container.querySelector("div[tabindex='-1']") || container;
+        // Try multiple strategies to find the scrollable reviews container
+        const byLabel = document.querySelector('[aria-label="Refine reviews"]')
+          ?.parentElement?.parentElement;
+        const byTabIndex = byLabel?.querySelector("div[tabindex='-1']");
+        const scrollable = byTabIndex || byLabel
+          || document.querySelector("div.m6QErb.DxyBCb.kA9KIf.dS8AEf")
+          || document.querySelector("div.m6QErb");
+        if (!scrollable) return false;
         scrollable.scrollTop = scrollable.scrollHeight;
         return true;
       });
@@ -478,7 +503,11 @@ app.post("/api/analyze-location", async (req, res) => {
 
     // ── Extract all reviews ─────────────────────────────────────────
     const reviews = await page.evaluate(() => {
-      const nodes = document.querySelectorAll("[data-review-id]");
+      // Primary: data-review-id containers
+      let nodes = document.querySelectorAll("[data-review-id]");
+      // Fallback: jftiEf class (review card container)
+      if (nodes.length === 0) nodes = document.querySelectorAll("div.jftiEf");
+
       return Array.from(nodes).map((node) => {
         const ratingEl = node.querySelector('span[aria-label*="star"]');
         const ratingLabel = ratingEl?.getAttribute("aria-label") || "";
@@ -490,7 +519,6 @@ app.post("/api/analyze-location", async (req, res) => {
         if (textContainer) {
           text = textContainer.textContent.trim();
         } else {
-          // Fallback: get text after the star rating
           const allSpans = node.querySelectorAll("span.wiI7pd");
           if (allSpans.length > 0) {
             text = allSpans[0].textContent.trim();
